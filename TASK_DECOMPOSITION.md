@@ -20,7 +20,7 @@ Commit: `27353bc docs: define HW2 rules and task decomposition`.
 - [x] Reset the idle canvas and cache canvas bounds outside the frame loop. Commit: `064e8b6 fix(visualizer): reset idle canvas and cache resize bounds`.
 - [x] Generate two self-contained short WAV fixtures and integrate the accessible StrictMode React demo. Commit: `a25e69e feat(demo): add local audio queue player`.
 - [x] Release per-task promise callbacks and cancellation controllers once they are no longer needed; validate their lifecycle in `verifyInvariants()`. Commit: `3b63191 fix(queue): release settled task resources`.
-- [x] Record actual automated/browser verification and reproduced AI defects in this file, `README.md`, and `AI_FAILURE_AUDIT.md`. Commit: `docs: record verification and AI failure audit`.
+- [x] Record actual automated/browser verification and reproduced AI defects in this file, `README.md`, and `AI_FAILURE_AUDIT.md`. Commit: `f125c7e docs: record verification and AI failure audit`.
 
 ## Stage 3 — Verification
 
@@ -36,8 +36,7 @@ Commit: `27353bc docs: define HW2 rules and task decomposition`.
 
 ## Stage 4 — Delivery
 
-- [ ] Push the complete `main` branch and commit history to `24521450/MSIS207.R11.CTTT.Week2.HW2` after committing the verification records.
-- [ ] Report the repository URL, verification results, frame evidence, and remaining unverified criteria in the delivery message.
+- [x] Push the complete `main` branch and commit history to `24521450/MSIS207.R11.CTTT.Week2.HW2`; GitHub reports public visibility and default branch `main`.
 
 ## Verification log
 
