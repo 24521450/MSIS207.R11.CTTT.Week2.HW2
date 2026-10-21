@@ -10,30 +10,31 @@ The implementation follows the four stages in slide 5: functional slices, contra
 
 ## Stage 2 — Atomic implementation tasks
 
-- [ ] Scaffold Vite + React + strict TypeScript, scripts, and baseline styles. Commit: `chore: scaffold strict React and Vite app`.
-- [ ] Implement task contracts, error helpers, task settlement, queue workers, FIFO playback cursor, cancellation, stop, and disposal. Commit: `feat(queue): add concurrent FIFO audio controller`.
-- [ ] Add deterministic controller tests and fix race conditions discovered by them. Commit: `test(queue): cover concurrency and lifecycle races`.
+- [x] Scaffold Vite + React + strict TypeScript, scripts, and baseline styles. Commit: `chore: scaffold strict React and Vite app` (`a608a33`).
+- [x] Implement task contracts, error helpers, task settlement, queue workers, FIFO playback cursor, cancellation, stop, and disposal. Commit: `feat(queue): add concurrent FIFO audio controller` (`5df8d9f`).
+- [x] Add deterministic controller/backend tests and fix defects found during verification. Commit: `test(queue): cover concurrency and lifecycle races` (pending).
 - [ ] Implement Canvas visualizer with reusable frequency buffer, RAF lifecycle, resize handling, and no frame-driven React state. Commit: `feat(visualizer): add RAF canvas frequency display`.
 - [ ] Generate and include two short local WAV fixtures; add accessible React demo controls, queue status, errors, and StrictMode lifecycle. Commit: `feat(demo): add local audio queue player`.
 - [ ] Verify browser playback and capture timestamp-based frame measurements; record actual test/build/browser evidence and three reproduced AI defects in README and `AI_FAILURE_AUDIT.md`. Commit: `docs: record verification and AI failure audit`.
 
 ## Stage 3 — Independent verification checklist
 
-- [ ] Enqueue multiple tasks at once; prove no more than two fetch/decode pipelines are active.
-- [ ] Reverse completion order with deferred doubles; prove FIFO playback order.
-- [ ] Cancel queued, downloading, decoding, and ready tasks; prove no cancelled task can later play or revive its status.
-- [ ] Exercise HTTP failure, decode rejection, playback start/end failure, and confirm later tasks continue.
-- [ ] Resolve decode/fetch callbacks after cancellation and after disposal; prove one promise settlement and no stale updates.
-- [ ] Call dispose twice and exercise React StrictMode setup/cleanup.
-- [ ] Run typecheck, test suite, and production build.
+- [x] Enqueue multiple tasks; test doubles confirm the two-worker limit and FIFO playback when decode completion order is reversed.
+- [x] Cancel queued, downloading, decoding, ready, and playing tasks; late decode/end callbacks cannot revive cancelled status.
+- [ ] Exercise HTTP failure, decode rejection, playback start/end failure, and confirm later tasks continue. HTTP, decode, and source-start failures are covered; the final browser pass is pending.
+- [x] Resolve decode callbacks after cancellation and disposal; confirm one promise settlement and no stale status update.
+- [x] Call dispose twice; StrictMode verification is pending the browser UI pass.
+- [x] Run the current core typecheck, unit suite, and production build.
 - [ ] Use the real browser and local WAV samples to verify Web Audio graph and controls; measure RAF timestamps and state environment/sample statistics.
-- [ ] Inspect Git diff/status and confirm `node_modules`, `dist`, and secrets are absent.
+- [ ] Inspect final Git diff/status and confirm `node_modules`, `dist`, and secrets are absent.
 
 ## Stage 4 — Delivery
 
-- [ ] Push the `main` branch and its Conventional Commit history to `24521450/MSIS207.R11.CTTT.Week2.HW2`.
+- [ ] Push the complete `main` branch and its Conventional Commit history to `24521450/MSIS207.R11.CTTT.Week2.HW2`.
 - [ ] Report repository URL, checks actually passed, performance measurements, and criteria still unverified.
 
 ## Verification log
 
-No implementation or verification result is claimed yet. Entries will be added only after the corresponding commands/browser checks have run.
+- 2026-10-21 (Asia/Saigon), core-only checkpoint: `npm run typecheck` passed; `npm test -- --reporter=dot` passed (13 tests in 2 files); `npm run build` passed; `npm run lint` passed. This checkpoint predates the Canvas visualizer and demo integration.
+- Defects found and corrected during development: a TypeScript 6 `erasableSyntaxOnly` compile error from a constructor parameter property; a valid settled `ready` task rejected by `verifyInvariants()`; and a source cleanup exception that could skip the natural-end callback and retain the buffer.
+- Browser playback and frame timing have not been measured yet.

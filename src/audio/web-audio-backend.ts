@@ -8,7 +8,6 @@ export class WebAudioBackend implements AudioBackend {
   private activeSource: AudioBufferSourceNode | null = null
   private disposed = false
   private disposePromise: Promise<void> | null = null
-
   private readonly createContext: AudioContextFactory
 
   constructor(createContext: AudioContextFactory = () => new AudioContext()) {
@@ -30,9 +29,8 @@ export class WebAudioBackend implements AudioBackend {
     const context = this.getContext()
     const analyser = this.getOrCreateAnalyser(context)
     const source = context.createBufferSource()
-    source.buffer = buffer
-    source.connect(analyser)
     this.activeSource = source
+    source.buffer = buffer
     source.onended = () => {
       if (this.activeSource !== source) {
         return
@@ -42,6 +40,7 @@ export class WebAudioBackend implements AudioBackend {
     }
 
     try {
+      source.connect(analyser)
       source.start()
     } catch (error) {
       this.releaseSource(source)
@@ -62,7 +61,12 @@ export class WebAudioBackend implements AudioBackend {
     } catch {
       // A source that has already ended cannot be stopped again.
     }
-    source.disconnect()
+    try {
+      source.disconnect()
+    } catch {
+      // Continue clearing the source even if it has no remaining connections.
+    }
+    source.buffer = null
   }
 
   getAnalyser(): AnalyserNode | null {
@@ -76,15 +80,24 @@ export class WebAudioBackend implements AudioBackend {
 
     this.disposed = true
     this.stop()
-    this.analyser?.disconnect()
+    const analyser = this.analyser
     this.analyser = null
+    try {
+      analyser?.disconnect()
+    } catch {
+      // Closing the context still releases the graph if the node was disconnected already.
+    }
 
     const context = this.context
     this.context = null
     if (!context || context.state === 'closed') {
       this.disposePromise = Promise.resolve()
     } else {
-      this.disposePromise = context.close()
+      try {
+        this.disposePromise = context.close()
+      } catch (error) {
+        this.disposePromise = Promise.reject(error)
+      }
     }
     return this.disposePromise
   }
@@ -101,7 +114,16 @@ export class WebAudioBackend implements AudioBackend {
     if (!this.analyser) {
       const analyser = context.createAnalyser()
       analyser.fftSize = 512
-      analyser.connect(context.destination)
+      try {
+        analyser.connect(context.destination)
+      } catch (error) {
+        try {
+          analyser.disconnect()
+        } catch {
+          // Ignore a partial graph cleanup failure and surface the original connect error.
+        }
+        throw error
+      }
       this.analyser = analyser
     }
     return this.analyser
@@ -109,7 +131,12 @@ export class WebAudioBackend implements AudioBackend {
 
   private releaseSource(source: AudioBufferSourceNode): void {
     source.onended = null
-    source.disconnect()
+    try {
+      source.disconnect()
+    } catch {
+      // Natural completion must still advance the queue if disconnect is already complete.
+    }
+    source.buffer = null
     if (this.activeSource === source) {
       this.activeSource = null
     }

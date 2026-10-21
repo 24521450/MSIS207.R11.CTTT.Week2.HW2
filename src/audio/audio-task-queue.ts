@@ -205,7 +205,8 @@ export class AudioTaskQueue implements AudioQueueController {
       if (this.isTerminal(task.status) && (!task.settled || task.buffer !== null)) {
         return false
       }
-      if (!this.isTerminal(task.status) && task.settled) {
+      const canStillSettle = task.status === 'queued' || task.status === 'downloading' || task.status === 'decoding'
+      if (canStillSettle === task.settled) {
         return false
       }
       if (task.status === 'playing') {
