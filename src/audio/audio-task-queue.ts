@@ -24,11 +24,12 @@ const allowedTransitions: Readonly<Record<AudioTaskStatus, readonly AudioTaskSta
   error: [],
 }
 
-interface AudioTaskRecord extends AudioTask {
+interface AudioTaskRecord extends Omit<AudioTask, 'abortController'> {
+  abortController: AbortController | null
   buffer: AudioBuffer | null
   settled: boolean
-  resolve: (buffer: AudioBuffer) => void
-  reject: (reason: unknown) => void
+  resolve: ((buffer: AudioBuffer) => void) | null
+  reject: ((reason: unknown) => void) | null
 }
 
 export interface AudioTaskQueueOptions {
@@ -97,7 +98,7 @@ export class AudioTaskQueue implements AudioQueueController {
       return false
     }
 
-    task.abortController.abort()
+    task.abortController?.abort()
     if (this.activePlaybackId === task.id) {
       this.activePlaybackId = null
       try {
@@ -209,6 +210,12 @@ export class AudioTaskQueue implements AudioQueueController {
       if (canStillSettle === task.settled) {
         return false
       }
+      if (canStillSettle !== (task.abortController !== null)) {
+        return false
+      }
+      if (task.settled === (task.resolve !== null || task.reject !== null)) {
+        return false
+      }
       if (task.status === 'playing') {
         playingCount += 1
         if (this.activePlaybackId !== task.id) {
@@ -236,7 +243,7 @@ export class AudioTaskQueue implements AudioQueueController {
 
     for (const task of this.tasks.values()) {
       if (!this.isTerminal(task.status)) {
-        task.abortController.abort()
+        task.abortController?.abort()
         this.transition(task, 'cancelled')
         this.settleRejected(task, createAbortError('The audio queue has been disposed.'))
       }
@@ -269,10 +276,14 @@ export class AudioTaskQueue implements AudioQueueController {
   }
 
   private async processTask(task: AudioTaskRecord): Promise<void> {
+    const abortController = task.abortController
     try {
       this.transition(task, 'downloading')
       this.notify()
-      const response = await this.fetchAudio(task.trackUrl, { signal: task.abortController.signal })
+      if (!abortController) {
+        throw new Error('Queued audio task is missing its cancellation controller.')
+      }
+      const response = await this.fetchAudio(task.trackUrl, { signal: abortController.signal })
       if (this.shouldIgnore(task)) {
         return
       }
@@ -364,7 +375,7 @@ export class AudioTaskQueue implements AudioQueueController {
     }
 
     this.activePlaybackId = null
-    task.abortController.abort()
+    task.abortController?.abort()
     this.transition(task, 'error', describeAudioError(error))
     task.buffer = null
     this.playbackCursor = task.order + 1
@@ -373,7 +384,7 @@ export class AudioTaskQueue implements AudioQueueController {
   }
 
   private shouldIgnore(task: AudioTaskRecord): boolean {
-    return this.disposed || task.abortController.signal.aborted || task.status === 'cancelled'
+    return this.disposed || task.status === 'cancelled'
   }
 
   private isTerminal(status: AudioTaskStatus): boolean {
@@ -385,6 +396,9 @@ export class AudioTaskQueue implements AudioQueueController {
       throw new Error(`Invalid audio task transition: ${task.status} -> ${status}.`)
     }
     task.status = status
+    if (status === 'ready' || this.isTerminal(status)) {
+      task.abortController = null
+    }
     if (error) {
       task.error = error
     } else {
@@ -397,7 +411,10 @@ export class AudioTaskQueue implements AudioQueueController {
       return
     }
     task.settled = true
-    task.resolve(buffer)
+    const resolve = task.resolve
+    task.resolve = null
+    task.reject = null
+    resolve?.(buffer)
   }
 
   private settleRejected(task: AudioTaskRecord, error: unknown): void {
@@ -405,7 +422,10 @@ export class AudioTaskQueue implements AudioQueueController {
       return
     }
     task.settled = true
-    task.reject(error)
+    const reject = task.reject
+    task.resolve = null
+    task.reject = null
+    reject?.(error)
   }
 
   private toSnapshot(task: AudioTaskRecord): AudioTaskSnapshot {
