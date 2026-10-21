@@ -57,7 +57,8 @@ export class CanvasVisualizer {
   private frameId: number | null = null
   private running = false
   private disposed = false
-
+  private logicalWidth = 0
+  private logicalHeight = 0
   private readonly canvas: HTMLCanvasElement
 
   constructor(canvas: HTMLCanvasElement, options: CanvasVisualizerOptions = {}) {
@@ -88,6 +89,7 @@ export class CanvasVisualizer {
 
     this.running = false
     this.cancelFrame()
+    this.drawIdle(this.logicalWidth, this.logicalHeight)
   }
 
   dispose(): void {
@@ -109,6 +111,8 @@ export class CanvasVisualizer {
     }
 
     const bounds = this.canvas.getBoundingClientRect()
+    this.logicalWidth = bounds.width
+    this.logicalHeight = bounds.height
     const pixelRatio = Math.max(1, this.readDevicePixelRatio())
     const width = Math.max(1, Math.round(bounds.width * pixelRatio))
     const height = Math.max(1, Math.round(bounds.height * pixelRatio))
@@ -138,9 +142,8 @@ export class CanvasVisualizer {
       return
     }
 
-    const bounds = this.canvas.getBoundingClientRect()
-    const width = bounds.width
-    const height = bounds.height
+    const width = this.logicalWidth
+    const height = this.logicalHeight
     context.clearRect(0, 0, width, height)
     context.fillStyle = '#10182b'
     context.fillRect(0, 0, width, height)

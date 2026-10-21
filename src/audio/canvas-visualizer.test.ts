@@ -35,13 +35,14 @@ function createCanvas() {
     setTransform: vi.fn(),
   } as unknown as CanvasRenderingContext2D
   const bounds = { width: 320, height: 120 }
+  const getBounds = vi.fn(() => ({ ...bounds }) as DOMRect)
   const canvas = {
     width: 0,
     height: 0,
     getContext: vi.fn(() => drawing),
-    getBoundingClientRect: vi.fn(() => ({ ...bounds }) as DOMRect),
+    getBoundingClientRect: getBounds,
   } as unknown as HTMLCanvasElement
-  return { canvas, drawing, fillRect }
+  return { canvas, drawing, fillRect, getBounds }
 }
 
 function createAnalyser() {
@@ -57,7 +58,7 @@ function createAnalyser() {
 
 describe('CanvasVisualizer', () => {
   it('reuses one frequency buffer across frames and cancels RAF on stop', () => {
-    const { canvas, drawing, fillRect } = createCanvas()
+    const { canvas, drawing, fillRect, getBounds } = createCanvas()
     const scheduler = new FakeScheduler()
     const { analyser, getByteFrequencyData } = createAnalyser()
     const timestamps: number[] = []
@@ -78,6 +79,7 @@ describe('CanvasVisualizer', () => {
     expect(scheduler.callbacks.size).toBe(0)
 
     visualizer.setAnalyser(analyser)
+    const resizeReads = getBounds.mock.calls.length
     expect(scheduler.callbacks.size).toBe(1)
     scheduler.tick(10)
     const firstBuffer = getByteFrequencyData.mock.calls[0]?.[0]
@@ -89,10 +91,12 @@ describe('CanvasVisualizer', () => {
     expect(getByteFrequencyData).toHaveBeenCalledTimes(2)
     expect(timestamps).toEqual([10, 26])
     expect(fillRect.mock.calls.length).toBeGreaterThan(256)
+    expect(getBounds).toHaveBeenCalledTimes(resizeReads)
 
     visualizer.setAnalyser(null)
     expect(scheduler.callbacks.size).toBe(0)
     expect(scheduler.cancel).toHaveBeenCalledTimes(1)
+    expect(fillRect.mock.calls.at(-1)?.[0]).toBeCloseTo(25.6)
     visualizer.dispose()
     visualizer.dispose()
     expect(stopObserving).toHaveBeenCalledTimes(1)

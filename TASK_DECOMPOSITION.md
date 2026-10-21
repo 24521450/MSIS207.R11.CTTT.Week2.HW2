@@ -14,6 +14,7 @@ The implementation follows the four stages in slide 5: functional slices, contra
 - [x] Implement task contracts, error helpers, task settlement, queue workers, FIFO playback cursor, cancellation, stop, and disposal. Commit: `feat(queue): add concurrent FIFO audio controller` (`5df8d9f`).
 - [x] Add deterministic controller/backend tests and fix defects found during verification. Commit: `test(queue): cover concurrency and lifecycle races` (pending).
 - [x] Implement Canvas visualizer with reusable frequency buffer, RAF lifecycle, resize handling, and no frame-driven React state. Commit: `feat(visualizer): add RAF canvas frequency display`.
+- [x] Cache canvas bounds between resize events and reset the spectrum display when playback pauses. Commit: ix(visualizer): reset idle canvas and cache resize bounds (pending).
 - [ ] Generate and include two short local WAV fixtures; add accessible React demo controls, queue status, errors, and StrictMode lifecycle. Commit: `feat(demo): add local audio queue player`.
 - [ ] Verify browser playback and capture timestamp-based frame measurements; record actual test/build/browser evidence and three reproduced AI defects in README and `AI_FAILURE_AUDIT.md`. Commit: `docs: record verification and AI failure audit`.
 
