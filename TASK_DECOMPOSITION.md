@@ -13,7 +13,7 @@ The implementation follows the four stages in slide 5: functional slices, contra
 - [x] Scaffold Vite + React + strict TypeScript, scripts, and baseline styles. Commit: `chore: scaffold strict React and Vite app` (`a608a33`).
 - [x] Implement task contracts, error helpers, task settlement, queue workers, FIFO playback cursor, cancellation, stop, and disposal. Commit: `feat(queue): add concurrent FIFO audio controller` (`5df8d9f`).
 - [x] Add deterministic controller/backend tests and fix defects found during verification. Commit: `test(queue): cover concurrency and lifecycle races` (pending).
-- [ ] Implement Canvas visualizer with reusable frequency buffer, RAF lifecycle, resize handling, and no frame-driven React state. Commit: `feat(visualizer): add RAF canvas frequency display`.
+- [x] Implement Canvas visualizer with reusable frequency buffer, RAF lifecycle, resize handling, and no frame-driven React state. Commit: `feat(visualizer): add RAF canvas frequency display`.
 - [ ] Generate and include two short local WAV fixtures; add accessible React demo controls, queue status, errors, and StrictMode lifecycle. Commit: `feat(demo): add local audio queue player`.
 - [ ] Verify browser playback and capture timestamp-based frame measurements; record actual test/build/browser evidence and three reproduced AI defects in README and `AI_FAILURE_AUDIT.md`. Commit: `docs: record verification and AI failure audit`.
 
@@ -35,6 +35,6 @@ The implementation follows the four stages in slide 5: functional slices, contra
 
 ## Verification log
 
-- 2026-10-21 (Asia/Saigon), core-only checkpoint: `npm run typecheck` passed; `npm test -- --reporter=dot` passed (13 tests in 2 files); `npm run build` passed; `npm run lint` passed. This checkpoint predates the Canvas visualizer and demo integration.
+- 2026-10-21 (Asia/Saigon), core-only checkpoint: `npm run typecheck` passed; `npm test -- --reporter=dot` passed (15 tests in 3 files); `npm run build` passed; `npm run lint` passed. This checkpoint includes the Canvas module and core controller; demo integration is pending.
 - Defects found and corrected during development: a TypeScript 6 `erasableSyntaxOnly` compile error from a constructor parameter property; a valid settled `ready` task rejected by `verifyInvariants()`; and a source cleanup exception that could skip the natural-end callback and retain the buffer.
 - Browser playback and frame timing have not been measured yet.
