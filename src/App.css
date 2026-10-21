@@ -1,0 +1,23 @@
+.app-shell {
+  width: min(100% - 2rem, 68rem);
+  margin: 0 auto;
+  padding: 5rem 0;
+}
+
+.eyebrow {
+  color: #34d399;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0.5rem 0;
+  font-size: clamp(2rem, 5vw, 4rem);
+}
+
+.intro {
+  color: #a8b3c7;
+  line-height: 1.6;
+}
