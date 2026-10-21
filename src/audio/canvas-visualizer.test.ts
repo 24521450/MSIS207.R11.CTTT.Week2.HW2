@@ -26,7 +26,7 @@ class FakeScheduler implements AnimationFrameScheduler {
   }
 }
 
-function createCanvas() {
+function createCanvas(initialWidth = 320) {
   const fillRect = vi.fn()
   const drawing = {
     fillStyle: '',
@@ -34,7 +34,7 @@ function createCanvas() {
     fillRect,
     setTransform: vi.fn(),
   } as unknown as CanvasRenderingContext2D
-  const bounds = { width: 320, height: 120 }
+  const bounds = { width: initialWidth, height: 120 }
   const getBounds = vi.fn(() => ({ ...bounds }) as DOMRect)
   const canvas = {
     width: 0,
@@ -42,7 +42,16 @@ function createCanvas() {
     getContext: vi.fn(() => drawing),
     getBoundingClientRect: getBounds,
   } as unknown as HTMLCanvasElement
-  return { canvas, drawing, fillRect, getBounds }
+  return {
+    canvas,
+    drawing,
+    fillRect,
+    getBounds,
+    setBounds: (width: number, height = bounds.height): void => {
+      bounds.width = width
+      bounds.height = height
+    },
+  }
 }
 
 function createAnalyser() {
@@ -117,5 +126,88 @@ describe('CanvasVisualizer', () => {
     expect(scheduler.callbacks.size).toBe(1)
     visualizer.dispose()
     expect(scheduler.callbacks.size).toBe(0)
+  })
+
+  it.each([1, 2])('draws every frequency bin within resized bounds at DPR %i', (pixelRatio) => {
+    const { canvas, drawing, fillRect, setBounds } = createCanvas(640)
+    const scheduler = new FakeScheduler()
+    const { analyser } = createAnalyser()
+    const stopObserving = vi.fn()
+    let resize!: () => void
+    const visualizer = new CanvasVisualizer(canvas, {
+      scheduler,
+      devicePixelRatio: () => pixelRatio,
+      observeResize: (_canvas, onResize) => {
+        resize = onResize
+        return stopObserving
+      },
+    })
+    visualizer.setAnalyser(analyser)
+
+    const expectAllBinsFit = (width: number, timestamp: number): void => {
+      fillRect.mockClear()
+      scheduler.tick(timestamp)
+      const barCalls = fillRect.mock.calls.slice(1)
+      expect(barCalls).toHaveLength(256)
+      for (const call of barCalls) {
+        const x = Number(call[0])
+        const barWidth = Number(call[2])
+        expect(x).toBeGreaterThanOrEqual(0)
+        expect(barWidth).toBeGreaterThan(0)
+        expect(x + barWidth).toBeLessThanOrEqual(width + 0.000001)
+      }
+
+      const lastBin = barCalls[255]
+      expect(lastBin).toBeDefined()
+      expect(Number(lastBin?.[0])).toBeCloseTo((255 * width) / 256)
+      expect(Number(lastBin?.[0]) + Number(lastBin?.[2])).toBeGreaterThan(Number(lastBin?.[0]))
+      expect(canvas.width).toBe(Math.round(width * pixelRatio))
+      expect(canvas.height).toBe(Math.round(120 * pixelRatio))
+      expect(drawing.setTransform).toHaveBeenLastCalledWith(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    }
+
+    expectAllBinsFit(640, 1)
+    for (const [index, width] of [320, 144, 640].entries()) {
+      setBounds(width)
+      resize()
+      expectAllBinsFit(width, index + 2)
+    }
+
+    visualizer.dispose()
+    expect(scheduler.callbacks.size).toBe(0)
+    expect(stopObserving).toHaveBeenCalledTimes(1)
+  })
+
+  it('releases RAF and its resize listener after repeated visualization cycles', () => {
+    const { canvas } = createCanvas(320)
+    const scheduler = new FakeScheduler()
+    const { analyser, getByteFrequencyData } = createAnalyser()
+    const resizeListeners = new Set<() => void>()
+    const stopObserving = vi.fn((listener: () => void) => resizeListeners.delete(listener))
+    const visualizer = new CanvasVisualizer(canvas, {
+      scheduler,
+      devicePixelRatio: () => 2,
+      observeResize: (_canvas, onResize) => {
+        resizeListeners.add(onResize)
+        return () => stopObserving(onResize)
+      },
+    })
+
+    for (let cycle = 0; cycle < 30; cycle += 1) {
+      visualizer.setAnalyser(analyser)
+      scheduler.tick(cycle)
+      visualizer.setAnalyser(null)
+      expect(scheduler.callbacks.size).toBe(0)
+      expect(resizeListeners.size).toBe(1)
+    }
+
+    expect(getByteFrequencyData).toHaveBeenCalledTimes(30)
+    visualizer.setAnalyser(analyser)
+    expect(scheduler.callbacks.size).toBe(1)
+    visualizer.dispose()
+    expect(scheduler.callbacks.size).toBe(0)
+    expect(resizeListeners.size).toBe(0)
+    expect(stopObserving).toHaveBeenCalledTimes(1)
+    expect(getByteFrequencyData).toHaveBeenCalledTimes(30)
   })
 })

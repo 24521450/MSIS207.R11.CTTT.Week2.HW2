@@ -38,13 +38,15 @@ Canvas visualizer sở hữu RAF và một `Uint8Array` dùng lại cho các fra
 ## Kiểm chứng đã chạy
 
 - `npm run typecheck` — passed.
-- `npm test -- --reporter=dot` — 17 tests trong 3 files passed. Test doubles bao phủ giới hạn concurrency, FIFO khi decode đảo thứ tự, cancellation ở các pha, lỗi tải/giải mã/resume/start, callback muộn, resolve đúng một lần, dispose hai lần, nguồn mới khi phát lại và reuse buffer Canvas.
+- `npm test -- --reporter=dot` — 22 tests trong 3 files passed. Test doubles bao phủ giới hạn concurrency, FIFO khi decode đảo thứ tự, cancellation ở các pha, lỗi tải/giải mã/resume/start, callback muộn, resolve đúng một lần, dispose hai lần, nguồn mới khi phát lại, geometry Canvas/resize/DPR và nhiều chu kỳ cleanup.
 - `npm run lint` — passed, không còn warning.
 - `npm run build` — passed với Vite production build.
-- Browser: ChatGPT in-app browser, Chrome 155 trên Windows UA, viewport 1280×720 CSS px, DPR 2. Hai WAV cục bộ tải/giải mã/phát được theo thứ tự; URL form, hủy task ready, stop về ready, natural end và thao tác Phát lại sau khi queue drain đã được kiểm tra.
-- Đo RAF từ callback thật của CanvasVisualizer trong một lượt phát: 100 timestamps / 99 intervals, trung bình 16.67 ms, median 16.70 ms, p95 18.10 ms, min 7.70 ms, max 26.00 ms; 50/99 intervals không vượt 16.7 ms. Cửa sổ đo ngắn có jitter nên không đủ bằng chứng để khẳng định đạt 60 FPS ổn định.
+- Regression hình học Canvas: test kiểm tra 256 lệnh vẽ và từng tọa độ thực tế tại 320 px và 144 px; resize `640 → 320 → 144 → 640` ở cả DPR 1 và 2. Không cột nào vượt quá logical width, bin cuối vẫn có chiều rộng dương, kích thước backing store theo DPR.
+- Browser desktop: ChatGPT in-app Chromium trên Windows, viewport 1280×900 CSS px, DPR 1, Canvas rộng 882.4 px. Browser mobile viewport: 390×844 CSS px, DPR 1, Canvas rộng 299.8 px. Trên mobile viewport đã phát cả hai WAV, hủy một task ready, dừng Soft Pulse về ready, phát lại và xác nhận natural end; desktop phát queue 14 WAV xen kẽ hai mẫu. Browser console error/warning list rỗng sau các lượt này. Mobile được kiểm tra bằng responsive viewport override trong browser, không phải thiết bị cầm tay vật lý.
+- Đo RAF từ timestamp của callback thật trong lượt phát desktop 14 mẫu liên tục: **1.200 timestamps / 1.199 intervals / 39.93 giây**; trung bình **33.305 ms**, median **33.300 ms**, p95 **33.900 ms**, min **15.900 ms**, max **83.400 ms**. Kết quả của phiên này gần 30 Hz và có jitter; không khẳng định đạt 60 FPS ổn định. Instrumentation chỉ dùng để đo, không có trong mã cuối.
+- Kiểm tra cleanup bằng test doubles: 30 chu kỳ queue enqueue/play/cancel/stop rồi dispose hai lần; 40 AudioBufferSourceNode qua natural-end/stop đều disconnect, xóa buffer và handler, AudioContext đóng một lần; 30 chu kỳ visualizer stop/start không để lại RAF và resize listener được gỡ khi dispose.
 
-Chưa chạy heap profiler hoặc phép đo dài hạn để kết luận không rò rỉ bộ nhớ. Chi tiết các lỗi AI thực tế đã gặp và cách sửa nằm trong [AI_FAILURE_AUDIT.md](AI_FAILURE_AUDIT.md).
+Chưa chạy heap profiler, phép đo heap dài hạn hoặc test trên điện thoại vật lý; không kết luận đã chứng minh không rò rỉ bộ nhớ. Chi tiết các lỗi AI thực tế đã gặp và cách sửa nằm trong [AI_FAILURE_AUDIT.md](AI_FAILURE_AUDIT.md). Regression hẹp Canvas được báo từ lượt review độc lập và được ghi ở phần kiểm chứng này; không gán nhầm nó thành lỗi AI trong audit.
 
 ## Repository
 

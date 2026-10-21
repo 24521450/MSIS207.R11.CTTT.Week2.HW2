@@ -21,6 +21,7 @@ Commit: `27353bc docs: define HW2 rules and task decomposition`.
 - [x] Generate two self-contained short WAV fixtures and integrate the accessible StrictMode React demo. Commit: `a25e69e feat(demo): add local audio queue player`.
 - [x] Release per-task promise callbacks and cancellation controllers once they are no longer needed; validate their lifecycle in `verifyInvariants()`. Commit: `3b63191 fix(queue): release settled task resources`.
 - [x] Record actual automated/browser verification and reproduced AI defects in this file, `README.md`, and `AI_FAILURE_AUDIT.md`. Commit: `f125c7e docs: record verification and AI failure audit`.
+- [x] Fix adaptive Canvas bin geometry and add narrow-width, resize/DPR, and repeated resource-lifecycle regression tests; update measured evidence.
 
 ## Stage 3 — Verification
 
@@ -29,9 +30,10 @@ Commit: `27353bc docs: define HW2 rules and task decomposition`.
 - [x] Verify HTTP, decode, resume, and source-start failures; later queue items continue.
 - [x] Resolve decode and playback callbacks after cancellation/disposal; verify one promise settlement and no state revival.
 - [x] Call dispose twice; exercise the app under React StrictMode in the browser with no console errors or warnings.
+- [x] Exercise 30 queue enqueue/play/cancel/stop cycles and dispose twice; test 40 source natural-end/stop releases, one context close, and 30 RAF/listener cleanup cycles using deterministic doubles.
 - [x] Run typecheck, unit tests, lint, and production build.
-- [x] In a browser, verify local WAV fetch/decode, actual Web Audio playback in FIFO order, stop/replay, natural completion, cancellation, and queue-drain behavior.
-- [x] Measure actual Canvas visualizer frame timestamps during playback and record environment and limitations below.
+- [x] In desktop and mobile responsive browser viewports, verify local WAV fetch/decode/playback, both samples, stop/replay, cancellation, and natural completion.
+- [x] Measure an extended Canvas visualizer timestamp sample and record environment and limitations below.
 - [x] Review final Git status and confirm `node_modules` and `dist` are ignored.
 
 ## Stage 4 — Delivery
@@ -42,11 +44,13 @@ Commit: `27353bc docs: define HW2 rules and task decomposition`.
 
 - Date: 2026-10-21 (Asia/Saigon).
 - `npm run typecheck`: passed.
-- `npm test -- --reporter=dot`: 17 tests across 3 files passed.
+- `npm test -- --reporter=dot`: 22 tests across 3 files passed.
 - `npm run lint`: passed with no warnings.
 - `npm run build`: passed (Vite production build).
 - `git diff --check`: passed; `git check-ignore node_modules dist` confirmed both generated directories are ignored.
-- Browser session: ChatGPT in-app browser, Chrome 155 user-agent on Windows, viewport 1280×720 CSS px, device pixel ratio 2. Both local WAV samples fetched, decoded, and played in enqueue order. Tested URL submission, ready-task cancellation, playing-task stop back to ready, replay, natural end, and requiring a new Play gesture after drain. Console error/warning list was empty during the final StrictMode smoke pass.
-- RAF sample during actual playback: 100 timestamps / 99 intervals, mean 16.67 ms, median 16.70 ms, p95 18.10 ms, minimum 7.70 ms, maximum 26.00 ms; 50/99 intervals were at or below 16.7 ms. This short sample has visible jitter and does not establish stable 60 FPS.
-- No heap profiler or long-duration memory test was run; absence of memory leaks is not claimed. Browser verification used the in-app Chromium browser, not a separate physical audio device matrix.
+- Geometry test: all 256 bar calls remain inside logical widths 320 px and 144 px and the final bin remains positive-width, after resize `640 → 320 → 144 → 640` at DPR 1 and 2. Backing dimensions and `setTransform` follow DPR.
+- Browser session: ChatGPT in-app Chromium browser on Windows. Desktop viewport 1280×900 CSS px, DPR 1, Canvas 882.4 px. Mobile responsive viewport 390×844 CSS px, DPR 1, Canvas 299.8 px. Both bundled WAVs played; mobile also exercised ready cancellation, stop to ready, replay, and natural completion. A desktop run played 14 alternating local WAVs. Error/warning list was empty in the final desktop session. The mobile check used a responsive viewport override, not a physical handset.
+- Extended RAF sample during desktop playback: 1,200 timestamps / 1,199 intervals over 39.93 seconds; mean 33.305 ms, median 33.300 ms, p95 33.900 ms, minimum 15.900 ms, maximum 83.400 ms. This run was close to 30 Hz with jitter, so it does not show stable 60 FPS.
+- Resource doubles: 30 queue cycles with play/cancel/stop then double dispose; 40 source end/stop cycles verified disconnect, null buffer and handler; one AudioContext close; 30 visualizer start/stop cycles left no RAF, and dispose removed its resize observer. These tests verify explicit lifecycle calls, not garbage collection.
+- No heap profiler or long-duration heap comparison was run; absence of memory leaks is not claimed. Browser verification was not done on a physical mobile device.
 - Actual defects found and fixed are documented with reproductions/evidence in `AI_FAILURE_AUDIT.md`; no defects or verification outcomes were invented.

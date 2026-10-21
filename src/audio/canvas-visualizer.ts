@@ -148,13 +148,15 @@ export class CanvasVisualizer {
     context.fillStyle = '#10182b'
     context.fillRect(0, 0, width, height)
 
-    const gap = 1
-    const barWidth = Math.max(1, (width - (binCount - 1) * gap) / binCount)
+    // Allocate one equal slot per bin so the final bar always remains inside the canvas.
+    const slotWidth = width / binCount
+    const gap = Math.min(1, slotWidth * 0.12)
+    const barWidth = Math.max(0, slotWidth - gap)
     context.fillStyle = '#36d6a0'
     for (let index = 0; index < binCount; index += 1) {
       const magnitude = (data[index] ?? 0) / 255
       const barHeight = Math.max(2, magnitude * height * 0.88)
-      const x = index * (barWidth + gap)
+      const x = index * slotWidth
       context.fillRect(x, height - barHeight, barWidth, barHeight)
     }
   }

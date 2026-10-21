@@ -454,4 +454,52 @@ describe('AudioTaskQueue', () => {
     expect(queue.verifyInvariants()).toBe(true)
     await queue.dispose()
   })
+
+  it('releases listener and playback resources through repeated enqueue, play, cancel, and dispose cycles', async () => {
+    const backend = new FakeAudioBackend()
+    const fetchAudio: FetchAudio = async (input) => {
+      const marker = Number(String(input).match(/sample-(\d+)/)?.[1] ?? 0)
+      return response(marker)
+    }
+    const queue = new AudioTaskQueue({ fetchAudio, backend })
+    const listener = vi.fn()
+    queue.subscribe(listener)
+
+    for (let index = 1; index <= 30; index += 1) {
+      const pending = queue.enqueue(`sample-${index}.wav`)
+      await flushMicrotasks()
+      const decode = backend.decodes.at(-1)
+      expect(decode?.marker).toBe(index)
+      decode?.operation.resolve(fakeBuffer(index))
+      await pending
+
+      const task = queue.getTasks().at(-1)
+      expect(task?.status).toBe('ready')
+      if (index % 7 === 0) {
+        expect(queue.cancelTask(task?.id ?? -1)).toBe(true)
+        expect(queue.getTasks().at(-1)?.status).toBe('cancelled')
+      } else {
+        await queue.startPlayback()
+        if (index % 2 === 0) {
+          queue.stopPlayback()
+          expect(queue.getTasks().at(-1)?.status).toBe('ready')
+          await queue.startPlayback()
+        }
+        backend.finishCurrent()
+        expect(queue.getTasks().at(-1)?.status).toBe('completed')
+      }
+      expect(queue.verifyInvariants()).toBe(true)
+    }
+
+    const notificationsBeforeDispose = listener.mock.calls.length
+    await Promise.all([queue.dispose(), queue.dispose()])
+    expect(backend.dispose).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledTimes(notificationsBeforeDispose)
+    const lateListener = vi.fn()
+    queue.subscribe(lateListener)
+    expect(lateListener).not.toHaveBeenCalled()
+    expect(queue.verifyInvariants()).toBe(true)
+    expect(queue.getTasks().filter((task) => task.status === 'completed')).toHaveLength(26)
+    expect(queue.getTasks().filter((task) => task.status === 'cancelled')).toHaveLength(4)
+  })
 })

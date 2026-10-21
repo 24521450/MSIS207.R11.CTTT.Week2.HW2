@@ -31,15 +31,18 @@ function createContextHarness() {
   Object.defineProperty(analyser, 'frequencyBinCount', {
     get: () => analyser.fftSize / 2,
   })
-  const sources = [createSource(), createSource()]
-  const sourceQueue = [...sources]
+  const sources: FakeSource[] = []
   const context = {
     get state() {
       return state
     },
     destination: {},
     createAnalyser: vi.fn(() => analyser),
-    createBufferSource: vi.fn(() => sourceQueue.shift() as unknown as AudioBufferSourceNode),
+    createBufferSource: vi.fn(() => {
+      const source = createSource()
+      sources.push(source)
+      return source as unknown as AudioBufferSourceNode
+    }),
     decodeAudioData: vi.fn(async () => ({ duration: 0.1 }) as AudioBuffer),
     resume: vi.fn(async () => {
       state = 'running'
@@ -118,5 +121,35 @@ describe('WebAudioBackend', () => {
     expect(onEnded).toHaveBeenCalledTimes(1)
     expect(backend.getAnalyser()).toBe(harness.analyser)
     await backend.dispose()
+  })
+
+  it('releases every source across repeated natural-end and stop cycles before closing the context', async () => {
+    const harness = createContextHarness()
+    const backend = new WebAudioBackend(() => harness.context)
+    const onEnded = vi.fn()
+    const buffer = { duration: 0.1 } as AudioBuffer
+    const cycleCount = 40
+
+    for (let index = 0; index < cycleCount; index += 1) {
+      backend.play(buffer, onEnded)
+      const source = harness.sources[index]
+      expect(source).toBeDefined()
+      if (index % 2 === 0) {
+        source?.onended?.call(source as unknown as AudioBufferSourceNode, new Event('ended'))
+      } else {
+        backend.stop()
+        expect(source?.stop).toHaveBeenCalledTimes(1)
+      }
+      expect(source?.disconnect).toHaveBeenCalledTimes(1)
+      expect(source?.buffer).toBeNull()
+      expect(source?.onended).toBeNull()
+    }
+
+    expect(harness.sources).toHaveLength(cycleCount)
+    expect(onEnded).toHaveBeenCalledTimes(cycleCount / 2)
+    await backend.dispose()
+    expect(harness.analyser.disconnect).toHaveBeenCalledTimes(1)
+    expect(harness.context.close).toHaveBeenCalledTimes(1)
+    expect(backend.getAnalyser()).toBeNull()
   })
 })
