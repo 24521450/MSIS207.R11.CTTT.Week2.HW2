@@ -319,6 +319,7 @@ export class AudioTaskQueue implements AudioQueueController {
     while (true) {
       const task = this.tasksByOrder.get(this.playbackCursor)
       if (!task) {
+        this.playbackRequested = false
         return
       }
 

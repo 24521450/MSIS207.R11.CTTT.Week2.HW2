@@ -35,6 +35,6 @@ The implementation follows the four stages in slide 5: functional slices, contra
 
 ## Verification log
 
-- 2026-10-21 (Asia/Saigon), core-only checkpoint: `npm run typecheck` passed; `npm test -- --reporter=dot` passed (15 tests in 3 files); `npm run build` passed; `npm run lint` passed. This checkpoint includes the Canvas module and core controller; demo integration is pending.
+- 2026-10-21 (Asia/Saigon), core-only checkpoint: `npm run typecheck` passed; `npm test -- --reporter=dot` passed (17 tests in 3 files); `npm run build` passed; `npm run lint` passed. This checkpoint includes the Canvas module and core controller; demo integration is pending.
 - Defects found and corrected during development: a TypeScript 6 `erasableSyntaxOnly` compile error from a constructor parameter property; a valid settled `ready` task rejected by `verifyInvariants()`; and a source cleanup exception that could skip the natural-end callback and retain the buffer.
-- Browser playback and frame timing have not been measured yet.
+- 2026-10-21 follow-up: `npm run typecheck`, `npm test -- --reporter=dot` (17 tests), and `npm run lint` passed after adding resume-failure retry and queue-drain disarming coverage. Final production build remains pending.

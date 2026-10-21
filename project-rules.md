@@ -23,8 +23,8 @@
   - `cancelTask(taskId: number): boolean` (cancels queued/downloading/decoding work and skips ready work in the playback order; returns false after settlement into a terminal state or for an unknown task).
   - `startPlayback(): Promise<void>` (called from a user gesture; resumes the suspended context, then drains playable tracks in enqueue order).
   - `stopPlayback(): void` (stops the current source and pauses queue playback; a manually stopped item returns to `ready` and can be replayed).
-  - `getTasks(): readonly AudioTaskSnapshot[]`, `subscribe(listener): unsubscribe`, and idempotent `dispose(): void`.
-- Work is FIFO at dequeue and has a fixed maximum of two active fetch/decode pipelines. Ready playback is independently gated by `order`, so later work cannot play before earlier work. Cancelled and failed items are skipped.
+  - `getTasks(): readonly AudioTaskSnapshot[]`, `getAnalyser()`, `subscribe(listener): unsubscribe`, `verifyInvariants(): boolean`, and idempotent `dispose(): Promise<void>`.
+- Work is FIFO at dequeue and has a fixed maximum of two active fetch/decode pipelines. Ready playback is independently gated by `order`, so later work cannot play before earlier work. Cancelled and failed items are skipped. Playback continues through the current queue while a Play request is active; it disarms when the cursor reaches the current queue tail, so tasks enqueued after it drains need another explicit Play action.
 - Every task gets its own `AbortController`. Fetch receives its signal. Decode has no abort signal; completion must re-check task identity/status/disposal before committing its result.
 - Each task promise has one settlement guard. Cancellation after decode cannot change the already-resolved promise.
 

@@ -218,32 +218,52 @@ describe('AudioTaskQueue', () => {
     await next
 
     expect(requests[0]?.signal?.aborted).toBe(true)
+    expect(requests[0]?.signal).not.toBe(requests[1]?.signal)
     expect(rejected).toHaveBeenCalledTimes(1)
     expect(queue.getTasks().map((task) => task.status)).toEqual(['cancelled', 'ready'])
     expect(queue.verifyInvariants()).toBe(true)
     await queue.dispose()
   })
 
-  it('ignores a decode that resolves after cancellation and never plays it', async () => {
+  it('ignores a late decode after cancellation and lets the next queued task run', async () => {
     const { queue, backend, requests } = createHarness()
-    const pending = queue.enqueue('decode-cancel.wav')
-    const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    const first = queue.enqueue('decode-cancel.wav')
+    const second = queue.enqueue('next-after-decode.wav')
+    const third = queue.enqueue('third.wav')
+    const firstRejection = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    await queue.startPlayback()
     requests[0]?.operation.resolve(response(1))
     await flushMicrotasks()
     expect(queue.getTasks()[0]?.status).toBe('decoding')
+    expect(requests.map((request) => request.url)).toEqual(['decode-cancel.wav', 'next-after-decode.wav'])
 
     expect(queue.cancelTask(1)).toBe(true)
-    await rejection
-    await queue.startPlayback()
+    await firstRejection
     backend.decodes[0]?.operation.resolve(fakeBuffer(1))
     await flushMicrotasks()
-
     expect(queue.getTasks()[0]?.status).toBe('cancelled')
-    expect(backend.played).toEqual([])
+    expect(requests.map((request) => request.url)).toEqual([
+      'decode-cancel.wav',
+      'next-after-decode.wav',
+      'third.wav',
+    ])
+
+    requests[1]?.operation.resolve(response(2))
+    requests[2]?.operation.resolve(response(3))
+    await flushMicrotasks()
+    backend.decodes[1]?.operation.resolve(fakeBuffer(2))
+    await second
+    backend.decodes[2]?.operation.resolve(fakeBuffer(3))
+    await third
+
+    expect(queue.getTasks().map((task) => task.status)).toEqual(['cancelled', 'playing', 'ready'])
+    expect(backend.played).toEqual([2])
+    backend.finishCurrent()
+    expect(backend.played).toEqual([2, 3])
+    backend.finishCurrent()
     expect(queue.verifyInvariants()).toBe(true)
     await queue.dispose()
   })
-
   it('cancels a ready task without changing its already-resolved promise', async () => {
     const { queue, backend, requests } = createHarness()
     const first = queue.enqueue('cancel-ready.wav')
@@ -386,5 +406,52 @@ describe('AudioTaskQueue', () => {
     expect(backend.played).toEqual([])
     expect(queue.verifyInvariants()).toBe(true)
     await expect(queue.enqueue('after-dispose.wav')).rejects.toMatchObject({ name: 'AbortError' })
+  })
+  it('requires another explicit Play gesture after the queue drains', async () => {
+    const { queue, backend, requests } = createHarness()
+    const first = queue.enqueue('first-session.wav')
+    requests[0]?.operation.resolve(response(1))
+    await flushMicrotasks()
+    backend.decodes[0]?.operation.resolve(fakeBuffer(1))
+    await first
+    await queue.startPlayback()
+    backend.finishCurrent()
+    expect(queue.getTasks()[0]?.status).toBe('completed')
+
+    const second = queue.enqueue('second-session.wav')
+    requests[1]?.operation.resolve(response(2))
+    await flushMicrotasks()
+    backend.decodes[1]?.operation.resolve(fakeBuffer(2))
+    await second
+    expect(queue.getTasks()[1]?.status).toBe('ready')
+    expect(backend.played).toEqual([1])
+
+    await queue.startPlayback()
+    expect(queue.getTasks()[1]?.status).toBe('playing')
+    expect(backend.played).toEqual([1, 2])
+    backend.finishCurrent()
+    expect(queue.verifyInvariants()).toBe(true)
+    await queue.dispose()
+  })
+  it('keeps a task ready when AudioContext resume fails and allows a later Play retry', async () => {
+    const { queue, backend, requests } = createHarness()
+    const pending = queue.enqueue('resume-retry.wav')
+    requests[0]?.operation.resolve(response(1))
+    await flushMicrotasks()
+    backend.decodes[0]?.operation.resolve(fakeBuffer(1))
+    await pending
+    backend.resume.mockRejectedValueOnce(new Error('user gesture required'))
+
+    await expect(queue.startPlayback()).rejects.toThrow('user gesture required')
+    expect(queue.getTasks()[0]?.status).toBe('ready')
+    expect(backend.played).toEqual([])
+
+    await queue.startPlayback()
+    expect(queue.getTasks()[0]?.status).toBe('playing')
+    expect(backend.played).toEqual([1])
+    backend.finishCurrent()
+    expect(queue.getTasks()[0]?.status).toBe('completed')
+    expect(queue.verifyInvariants()).toBe(true)
+    await queue.dispose()
   })
 })
